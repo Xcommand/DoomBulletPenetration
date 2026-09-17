@@ -1,0 +1,38 @@
+generator PenetrationTracer BulletChip
+
+decal d_dent1
+{
+	pic dent
+	translucent 0.05
+	x-scale 2
+	y-scale 2
+	randomflipx
+	randomflipy
+}
+
+decal d_dent2
+{
+	pic dent2
+	translucent 0.05
+	x-scale 2.5
+	y-scale 2.5
+	randomflipx
+	randomflipy
+}
+
+decal d_dent3
+{
+	pic dent3
+	translucent 0.05
+	x-scale 1.5
+	y-scale 1.5
+	randomflipx
+	randomflipy
+}
+
+decalgroup decg_dent
+{
+	d_dent1	1
+	d_dent2	1
+	d_dent3	1
+}

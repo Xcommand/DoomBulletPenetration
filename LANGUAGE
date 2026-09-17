@@ -1,0 +1,13 @@
+[enu default]
+MOD_PEN_MENU_TITLE = "Bullet Penetration Settings";
+MOD_PEN_MAX_COUNT = "Max Penetrations";
+MOD_PEN_WALL_THICK = "Max Wall Thickness";
+MOD_PEN_VAL_OFF = "Disabled";
+MOD_PEN_VAL_MAX = "Maximum";
+
+[rus]
+MOD_PEN_MENU_TITLE = "Настройки пробития пуль";
+MOD_PEN_MAX_COUNT = "Макс. пробитий";
+MOD_PEN_WALL_THICK = "Макс. толщина стены";
+MOD_PEN_VAL_OFF = "Выключено";
+MOD_PEN_VAL_MAX = "Максимум";

@@ -1,0 +1,24 @@
+OptionValue "PenetrationRange"
+{
+    0, "$MOD_PEN_VAL_OFF"
+    100, "$MOD_PEN_VAL_MAX"
+}
+
+OptionMenu "OptionsMenu"
+{
+    Submenu "$MOD_PEN_MENU_TITLE", "BulletPenetrationMenu"
+}
+
+OptionMenu "BulletPenetrationMenu"
+{
+    Title "$MOD_PEN_MENU_TITLE"
+    Slider "$MOD_PEN_MAX_COUNT", "mod_max_penetrations", 0, 128, 1
+    Slider "$MOD_PEN_WALL_THICK", "mod_max_wall_thickness", 8, 1024, 8
+    Option "Decal Rendering Mode", "vlt_decal_mode", "DecalStyleOptions"
+}
+
+OptionValue "DecalStyleOptions"
+{
+    0, "Off"
+    1, "Default (soot)"
+}
