@@ -12,7 +12,7 @@ class PenetrationTracer : Actor
         Height 0;
     }
     private Array<Actor> already_damaged;
-	private Array<Line> hitWalls;
+    private Array<Line> hitWalls;
 
     bool HasDamagedActor(Actor a) const
     {
@@ -27,19 +27,32 @@ class PenetrationTracer : Actor
     {
         already_damaged.Push(a);
     }
-	
-	void TrySprayEntryDecal(Line wallLine, Vector3 sprayPos, Vector3 shotDir, bool cvarMode)
+
+    void TrySprayEntryDecal(Line wallLine, Vector3 sprayPos, Vector3 shotDir, bool cvarMode, int iCvarcoutstyle)
     {
         if (!wallLine) return;
         if (hitWalls.Find(wallLine) != hitWalls.Size())
-        {	
-            return; 
+        {
+            return;
         }
         hitWalls.Push(wallLine);
         Vector3 originalPos = self.Pos;
         SetOrigin(sprayPos, true);
 
-        A_SprayDecal("BulletChip", 8.0, direction: -shotDir);
+		switch (iCvarcoutstyle)
+		{
+			case 0:
+				break;
+			case 1:
+				A_SprayDecal("BulletChip", 4.0, direction: -shotDir);
+				break;
+			case 2:
+				A_SprayDecal("cout", 4.0, direction: -shotDir);
+				break;
+			case 3:
+				A_SprayDecal("couthd", 4.0, direction: -shotDir);
+				break;
+		}
         if (cvarMode) A_SprayDecal("decg_dent", 8.0, direction: shotDir);
         SetOrigin(originalPos, true);
     }
@@ -73,11 +86,11 @@ class BulletPenetrationHandler : EventHandler
         shot_pitches.Push(e.AttackPitch);
 
         int dmg = e.Damage;
-        if (dmg <= 0) dmg = 0; // you wand negative damage? wut ¯\_(ツ)_/¯
+        if (dmg <= 0) dmg = 0; // you want negative damage? wut ¯\_(ツ)_/¯
         shot_damages.Push(dmg);
 
         if (debug) Console.printf("[PEN] buffered shot: dmg=%d", dmg);
-        return false; 
+        return false;
     }
 
     override void WorldTick()
@@ -93,7 +106,7 @@ class BulletPenetrationHandler : EventHandler
             if (max_p <= 0) continue;
             int max_thickness = CVar.GetCVar("mod_max_wall_thickness", plr).GetInt();
 
-            CVar dbgCv = CVar.GetCVar("mod_debug", plr);
+            CVar dbgCv = CVar.GetCVar("penetration_debug", plr);
             bool debug = (dbgCv && dbgCv.GetInt() != 0);
 
             double final_angle = shot_angles[s];
@@ -127,32 +140,38 @@ class BulletPenetrationHandler : EventHandler
 
             let trc = PenetrationTracer(Actor.Spawn("PenetrationTracer", c_pos));
 			CVar cvarMode = CVar.GetCVar('decal_mode', plr);
+			CVar coutstyle = CVar.GetCVar("decal_modeHD", plr);
+			bool bCvarModeValue = cvarMode.GetBool();
+			int iCvarcoutstyle = coutstyle.GetInt();
+
             if (trc)
             {
-                    trc.target = shooter;
-					trc.angle = VectorAngle(t_dir.X, t_dir.Y);
-					trc.pitch = -asin(t_dir.Z);
-					
-					int current_hit_type = f_hit.HitType;
-					Vector3 hit_spot = trc.Pos;
+                trc.target = shooter;
+                trc.angle = VectorAngle(t_dir.X, t_dir.Y);
+                trc.pitch = -asin(t_dir.Z);
 
-					if (f_hit.HitType == TRACE_HitWall)
-					{
-						trc.TrySprayEntryDecal(f_hit.HitLine, c_pos + (t_dir * 4.0), t_dir, cvarMode);
-					}
+                int current_hit_type = f_hit.HitType;
+                Vector3 hit_spot = trc.Pos;
 
-					while (p_count < max_p)
-					{
+                if (f_hit.HitType == TRACE_HitWall)
+                {
+                    trc.TrySprayEntryDecal(f_hit.HitLine, c_pos + (t_dir * 4.0), t_dir, bCvarModeValue, iCvarcoutstyle);
+                }
+
+                while (p_count < max_p)
+                {
                     guard++;
-                    if (guard > 2048) break;
+                    if (guard > 8192) break;
 
-                    // ok LET'S GOOOoooo.....
                     if (current_hit_type == TRACE_HitWall || current_hit_type == TRACE_HitFloor || current_hit_type == TRACE_HitCeiling)
                     {
                         Vector3 pos = trc.Pos;
                         Sector cur_sec = trc.Level.PointInSector(pos.XY);
                         if (!cur_sec) break;
 
+                        Vector3 enter_pos = pos;
+                        double enter_floor_z = cur_sec.floorplane.ZatPoint(enter_pos.XY);
+                        double enter_ceil_z  = cur_sec.ceilingplane.ZatPoint(enter_pos.XY);
                         double travelled = 0.0;
                         bool crossed = false;
                         Vector3 exit_pos = pos;
@@ -160,7 +179,6 @@ class BulletPenetrationHandler : EventHandler
                         int max_steps = max_thickness / 8 + 8;
                         for (int step = 0; step < max_steps; step++)
                         {
-
                             Vector3 prev = pos;
                             pos += t_dir * 8.0;
                             travelled += 8.0;
@@ -169,20 +187,16 @@ class BulletPenetrationHandler : EventHandler
                             Sector s2 = trc.Level.PointInSector(pos.XY);
                             if (s2 == cur_sec) continue;
                             if (!s2) break;
-							
-                            bool thin_band = false;
-                            Vector3 probe = pos;
-                            for (int pk = 0; pk < 3; pk++)
+
+                            Vector3 probe_forward = pos + (t_dir * 16.0);
+                            Sector s3 = trc.Level.PointInSector(probe_forward.XY);
+                            if (s3 != s2 && s3 != cur_sec && s3 != null)
                             {
-                                probe += t_dir * 8.0;
-                                if (trc.Level.PointInSector(probe.XY) != s2) { thin_band = true; break; }
+                                exit_pos = pos;
+                                crossed = true;
+                                break;
                             }
-                            if (debug) Console.printf("[PEN] scan step %d: new sector (floor=%.0f ceil=%.0f) thin=%d", step, s2.floorplane.ZatPoint(pos.XY), s2.ceilingplane.ZatPoint(pos.XY), thin_band ? 1 : 0);
-                            if (thin_band)
-                            {
-                                cur_sec = s2;
-                                continue;
-                            }
+
                             Vector3 lo = prev;
                             Vector3 hi = pos;
                             for (int it = 0; it < 8; it++)
@@ -200,16 +214,20 @@ class BulletPenetrationHandler : EventHandler
                             if (debug) Console.printf("[PEN] crossing FAILED at travelled=%.0f", travelled);
                             break;
                         }
+
                         p_count++;
                         if (debug) Console.printf("[PEN] crossed, penetration #%d, travelled=%.0f", p_count, travelled);
+
                         Sector exit_sector = trc.Level.PointInSector(exit_pos.XY);
                         if (exit_sector)
                         {
                             double floor_z = exit_sector.floorplane.ZatPoint(exit_pos.XY);
                             double ceil_z = exit_sector.ceilingplane.ZatPoint(exit_pos.XY);
-                            if (exit_pos.Z <= floor_z || exit_pos.Z >= ceil_z)
+
+                            if ((enter_pos.Z <= enter_floor_z && exit_pos.Z <= floor_z) ||
+                                (enter_pos.Z >= enter_ceil_z  && exit_pos.Z >= ceil_z))
                             {
-                                if (debug) Console.printf("[PEN] exit blocked by floor/ceiling behind wall");
+                                if (debug) Console.printf("[PEN] exit blocked: ray went completely out of bounds (deep underground/sky)");
                                 break;
                             }
                         }
@@ -221,25 +239,29 @@ class BulletPenetrationHandler : EventHandler
                         if (nudge < 0.25) nudge = 0.25;
 
                         Vector3 decal_origin = exit_pos + t_dir * nudge;
-                        trc.SetOrigin(decal_origin, true);
-						 if (hit.HitType == TRACE_HitWall && hit.HitLine != null)
+                        FLineTraceData back_hit;
+                        trc.LineTrace(back_probe_angle(t_dir), nudge + 16.0, back_probe_pitch(t_dir), TRF_ABSPOSITION | TRF_THRUACTORS, decal_origin.Z, decal_origin.X, decal_origin.Y, data: back_hit);
+                        if (back_hit.HitType == TRACE_HitWall && back_hit.HitLine != null)
                         {
-                            double nudge = 4.0;
-                            if (hit.Distance < 8.0) nudge = hit.Distance * 0.5;
-                            if (nudge < 0.25) nudge = 0.25;
+                            trc.TrySprayEntryDecal(back_hit.HitLine, back_hit.HitLocation, -t_dir, bCvarModeValue, iCvarcoutstyle);
+                        }
 
-                            Vector3 decal_origin = exit_pos + t_dir * nudge;
-                            trc.TrySprayEntryDecal(hit.HitLine, decal_origin, t_dir, cvarMode);
-                        }
-                        if (debug)
+                        //if (hit.HitType == TRACE_HitWall && hit.HitLine != null && hit.Distance < 64.0)
+                        //{
+                        //    trc.TrySprayEntryDecal(hit.HitLine, hit.HitLocation, t_dir, bCvarModeValue, iCvarcoutstyle);
+                        //}
+
+                        if (hit.HitType == TRACE_HitNone)
                         {
-                            FLineTraceData dbg;
-                            trc.LineTrace(back_probe_angle(t_dir), nudge + 4.0, back_probe_pitch(t_dir), TRF_ABSPOSITION | TRF_THRUACTORS, decal_origin.Z, decal_origin.X, decal_origin.Y, data: dbg);
-                            Console.printf("[PEN] spray probe: type=%d dist=%.1f", dbg.HitType, dbg.Distance);
+                            hit_spot = exit_pos + (t_dir * 16384);
+                            current_hit_type = TRACE_HitNone;
+                            trc.SetOrigin(exit_pos + t_dir * 2.0, true);
                         }
-                        if (hit.HitType == TRACE_HitNone) break;
-                        hit_spot = exit_pos + (t_dir * hit.Distance);
-                        current_hit_type = hit.HitType;
+                        else
+                        {
+                            hit_spot = exit_pos + (t_dir * hit.Distance);
+                            current_hit_type = hit.HitType;
+                        }
                     }
                     else
                     {
@@ -248,6 +270,7 @@ class BulletPenetrationHandler : EventHandler
                         hit_spot = trc.Pos + (t_dir * hit.Distance);
                         current_hit_type = hit.HitType;
                     }
+
                     if (hit.HitType == TRACE_HitActor && hit.HitActor)
                     {
                         Actor victim = hit.HitActor;
@@ -255,13 +278,6 @@ class BulletPenetrationHandler : EventHandler
                         {
                             victim.DamageMobj(shooter, shooter, c_dmg, 'Bullet');
                             trc.MarkDamaged(victim);
-                            if (debug) Console.printf("[PEN] actor hit: %s dmg=%d", victim.GetClassName(), c_dmg);
-                        }
-						else if (victim != shooter && victim != f_hit.HitActor && victim.bSHOOTABLE && !trc.HasDamagedActor(victim))
-						{
-                            victim.DamageMobj(shooter, shooter, c_dmg, 'Bullet');
-                            trc.MarkDamaged(victim);
-                            if (debug) Console.printf("[PEN] shootable hit(decoration?): %s dmg=%d", victim.GetClassName(), c_dmg);
                         }
                         double cosz = cos(trc.pitch);
                         if (cosz < 0.05) cosz = 0.05;
@@ -273,21 +289,16 @@ class BulletPenetrationHandler : EventHandler
                     {
                         Vector3 before = hit_spot - t_dir * 4.0;
                         trc.SetOrigin(before, true);
-                        if (debug) Console.printf("[PEN] entry decal on next wall");
                     }
                     else
                     {
-                        if (debug) Console.printf("[PEN] flight ended: hit floor/ceiling");
                         break;
                     }
                 }
                 trc.Destroy();
             }
         }
-        shot_shooters.Clear();
-        shot_angles.Clear();
-        shot_pitches.Clear();
-        shot_damages.Clear();
+        shot_shooters.Clear(); shot_angles.Clear(); shot_pitches.Clear(); shot_damages.Clear();
     }
     private double back_probe_angle(Vector3 t_dir) { return VectorAngle(-t_dir.X, -t_dir.Y); }
     private double back_probe_pitch(Vector3 t_dir) { return asin(t_dir.Z); }

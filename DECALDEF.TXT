@@ -36,3 +36,65 @@ decalgroup decg_dent
 	d_dent2	1
 	d_dent3	1
 }
+
+decal cout
+{
+	pic chipout
+	x-scale 0.1
+	y-scale 0.1
+	randomflipx
+	randomflipy
+}
+Decal couthd1
+{
+	Pic chiphd1
+	X-Scale 0.05
+	Y-Scale 0.05
+	RandomFlipX
+	RandomFlipY
+}
+
+Decal couthd2
+{
+	Pic chiphd2
+	X-Scale 0.05
+	Y-Scale 0.05
+	RandomFlipX
+	RandomFlipY
+}
+
+Decal couthd3
+{
+	Pic chiphd3
+	X-Scale 0.05
+	Y-Scale 0.05
+	RandomFlipX
+	RandomFlipY
+}
+
+Decal couthd4
+{
+	Pic chiphd4
+	X-Scale 0.05
+	Y-Scale 0.05
+	RandomFlipX
+	RandomFlipY
+}
+
+Decal couthd5
+{
+	Pic chiphd5
+	X-Scale 0.05
+	Y-Scale 0.05
+	RandomFlipX
+	RandomFlipY
+}
+
+DecalGroup couthd
+{
+	couthd1	1
+	couthd2	1
+	couthd3	1
+	couthd4	1
+	couthd5	1
+}
