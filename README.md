@@ -16,6 +16,12 @@ v1.2
 - Prevents occasional double damage on actors
 - Fixed bug where "exit bullet hole" was drawing on wrong side.
 - Penetration test map added in options menu (in case you want to test it on 1 unit thick solid or pegged walls and imps, or just to see what number of penetrations or wall thickness suits you)
-   
+
+v1.2a
+- Target dummy added on testmap.
+- BLOODY holes! Now if your bullet hit something that bleeds it will be covered in blood and leave a blood dripping hole.
+- Bloody holes can be toggled in options menu.
+- Blood decal quality also uses "Bullet exit hole style" where 0 - no decal, 1 and 2 - lowres sprite and 3 - HD version.
+
 TODO:
-- Damage reduction with each penetration.
+- Damage reduction with each penetration option: Reduction per penetration? Reduction based on penetrated material? Or both? hmmm
