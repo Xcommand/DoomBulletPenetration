@@ -98,3 +98,40 @@ DecalGroup couthd
 	couthd4	1
 	couthd5	1
 }
+
+
+
+Stretcher Dripper
+{
+	GoalY 0.2
+	StretchStart 0.001
+	StretchTime 15.0
+}
+
+Stretcher DripperHD
+{
+	GoalY 0.02
+	StretchStart 0.0001
+	StretchTime 15.0
+}
+
+
+
+Decal bldstr1
+{
+    Pic bldstr1
+	OpaqueBlood
+	X-Scale 0.2
+	Y-Scale 0.001
+    Animator Dripper
+	RandomFlipX
+}
+
+Decal bldstrhd
+{
+    Pic bldstrHD
+	OpaqueBlood
+	X-Scale 0.02
+	Y-Scale 0.0001
+    Animator DripperHD
+}

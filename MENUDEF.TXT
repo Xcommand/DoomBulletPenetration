@@ -10,11 +10,19 @@ OptionMenu "BulletPenetrationMenu"
     Slider "$MOD_PEN_WALL_THICK", "mod_max_wall_thickness", 2, 1024, 2
     Option "Accumulate soot", "decal_mode", "DecalStyleOptions"
     Option "Bullet exit hole style", "decal_modeHD", "DecalOutHD"
+    Option "Bullet hole bleeds if monster has been hit", "blood_transfer", "blood_transfer"
+    StaticText "=== Debug and penetration test map ==="
     Option "Debug mode", "penetration_debug", "PEN_Debug"
 	Command "Penetration test map", "map PTEST", 1, 1
 }
 
 OptionValue "DecalStyleOptions"
+{
+    0, "Off"
+    1, "On"
+}
+
+OptionValue "blood_transfer"
 {
     0, "Off"
     1, "On"

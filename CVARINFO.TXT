@@ -3,3 +3,4 @@ server int mod_max_wall_thickness = 512;
 server int penetration_debug = 0;
 server int decal_mode = 1;
 server int decal_modeHD = 1;
+server int blood_transfer = 1;

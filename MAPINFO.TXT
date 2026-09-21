@@ -1,3 +1,9 @@
+DoomEdNums
+{
+	22869	= "pen_targetdummy" //Targed dummy
+
+}
+
 GameInfo
 {
     AddEventHandlers = "BulletPenetrationHandler"

@@ -15,10 +15,12 @@
 // ~Down! (Pogo, pogo, pogo) Up! (Pogo, pogo, pogo)							//
 // ~Jump! (Pogo) Bounce! (Pogo) Up! (Pogo) Down! (Pogo)						//
 //																			//
-// Well you get the idea. X-command out ᕕ( ᐛ )ᕗ								//
-// Doom Penetration mod v1.2												//
+// Well you get the idea. X-command out ᕕ( ᐛ )ᕗ							//
+// Doom Penetration mod v1.2a												//
 //////////////////////////////////////////////////////////////////////////////
 version "4.14"
+
+#include "z_script/targetdummy.zs"
 
 class PenetrationTracer : Actor
 {
@@ -40,17 +42,19 @@ class PenetrationTracer : Actor
 		return false;
 	}
 	void MarkDamaged(Actor a) { already_damaged.Push(a); }
-	void SprayDecalFromPos(Vector3 pos, double ang, double pit, int style, bool dent)
+    void SprayDecalFromPos(Vector3 pos, double ang, double pit, int style, bool dent, bool blood)
 	{
 		SetOrigin(pos, true);
 		self.angle = ang;
 		self.pitch = pit;
-		Vector3 dir = (cos(pit) * cos(ang), cos(pit) * sin(ang), -sin(pit)); // uuuuugh math :<
+		Vector3 dir = (cos(pit) * cos(ang), cos(pit) * sin(ang), -sin(pit)); 									 // uuuuugh math :<
+		if (blood && !dent && (style == 1 || style == 2)) A_SprayDecal("bldstr1", 32.0, direction: dir);		 // 1.2a bloody hole
+		if (blood && !dent && (style == 3)) A_SprayDecal("bldstrhd", 32.0, direction: dir);						 // 1.2a bloody hole
 
 		switch (style)
 		{
 			case 0: break;
-			case 1: A_SprayDecal("BulletChip", 32.0, direction: dir); break;
+			case 1:	A_SprayDecal("BulletChip", 32.0, direction: dir); break;
 			case 2: A_SprayDecal("cout", 32.0, direction: dir); break;
 			case 3: A_SprayDecal("couthd", 32.0, direction: dir); break;
 		}
@@ -124,6 +128,9 @@ class BulletPenetrationHandler : EventHandler
 			CVar dbgCv = CVar.GetCVar("penetration_debug", plr);
 			bool debug = (dbgCv && dbgCv.GetInt() != 0);
 
+			CVar bldCv = CVar.GetCVar("blood_transfer", plr); // 1.2a bloody hole
+			bool bldhole = (bldCv);		 // 1.2a bloody hole
+
 			double final_angle = shot_angles[s];
 			double final_pitch = shot_pitches[s];
 			int	shot_damage = shot_damages[s];
@@ -148,6 +155,9 @@ class BulletPenetrationHandler : EventHandler
 			Array<double> exitX;
 			Array<double> exitY;
 			Array<double> exitZ;
+            Array<int>    entryBlood;	 // 1.2a bloody hole
+            Array<int>    exitBlood;	 // 1.2a bloody hole
+			int  blood_so_far = 0;		 // 1.2a bloody hole
 
 			int  wallCount  = 0;
 			int  actorCount = 0;
@@ -168,6 +178,19 @@ class BulletPenetrationHandler : EventHandler
 				if (hit.HitType == TRACE_HitActor && hit.HitActor)
 				{
 					Actor victim = hit.HitActor;
+
+					double cosz = cos(final_pitch);
+					if (cosz < 0.05) cosz = 0.05;
+					double skip = (victim.Radius * 3.0) / cosz + 6.0;
+					if (skip > 128.0) skip = 128.0;
+
+					if (victim == shooter) // ah hell naw i'm not the one who bleeds here
+					{
+						cur_pos = hit_spot + t_dir * skip;
+						first_hit = false;
+						continue;
+					}
+
 					bool already = false;
 
 					for (int k = 0; k < vanilla_hit.Size(); k++)
@@ -183,11 +206,7 @@ class BulletPenetrationHandler : EventHandler
 					}
 
 					trc.MarkDamaged(victim);
-
-					double cosz = cos(final_pitch);
-					if (cosz < 0.05) cosz = 0.05;
-					double skip = (victim.Radius * 3.0) / cosz + 6.0;
-					if (skip > 128.0) skip = 128.0;
+					if (!victim.bNoBlood || !bldhole) blood_so_far = 1; // 1.2a bloody hole
 
 					cur_pos = hit_spot + t_dir * skip;
 					first_hit = false;
@@ -198,6 +217,7 @@ class BulletPenetrationHandler : EventHandler
 				{
 					Line entry_line = hit.HitLine;
 					PushVec(entryX, entryY, entryZ, hit_spot);
+					entryBlood.Push(blood_so_far);
 
 					Vector3 exit_pos  = hit_spot;
 					bool   found_exit = false;
@@ -230,10 +250,11 @@ class BulletPenetrationHandler : EventHandler
 					}
 					double thickness = (exit_pos - hit_spot).Length();
 					PushVec(exitX, exitY, exitZ, exit_pos);
+					exitBlood.Push(blood_so_far);
 					wallCount++;
 
 					if (debug)
-						Console.printf("[PEN] wall #%d: thickness=%.2f", wallCount, thickness);
+						Console.printf("[PEN] wall #%d: thickness=%.2f blood=%d", wallCount, thickness, blood_so_far);
 
 					cur_pos   = exit_pos + t_dir * 0.5;
 					first_hit = false;
@@ -246,20 +267,22 @@ class BulletPenetrationHandler : EventHandler
 			{
 				Vector3 h = (entryX[i], entryY[i], entryZ[i]);
 				Vector3 sprayPos = h - t_dir * 4.0;
+				bool blood = (entryBlood[i] != 0);
 
 				if (i == 0)
 				{
-					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true);
+					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true, blood);
 					continue;
 				}
-				trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, iCoutStyle, false);
+				trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, iCoutStyle, false, blood);
 			}
 
 			for (int i = 0; i < exitX.Size(); i++)
 			{
 				Vector3 h = (exitX[i], exitY[i], exitZ[i]);
 				Vector3 sprayPos = h + t_dir * 4.0;
-				trc.SprayDecalFromPos(sprayPos, final_angle + 180.0, -final_pitch, iCoutStyle, false);
+				bool blood = (exitBlood[i] != 0);
+				trc.SprayDecalFromPos(sprayPos, final_angle + 180.0, -final_pitch, iCoutStyle, false, blood);
 			}
 			trc.Destroy();
 			if (debug) Console.printf("[TELLER] done: walls=%d actors=%d", wallCount, actorCount); // Penn and Teller. Get it? ha? well ok :<
