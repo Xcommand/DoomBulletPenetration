@@ -42,14 +42,19 @@ class PenetrationTracer : Actor
 		return false;
 	}
 	void MarkDamaged(Actor a) { already_damaged.Push(a); }
-    void SprayDecalFromPos(Vector3 pos, double ang, double pit, int style, bool dent, bool blood)
+    void SprayDecalFromPos(Vector3 pos, double ang, double pit, int style, bool dent, bool blood, Actor bloodActor)
 	{
 		SetOrigin(pos, true);
 		self.angle = ang;
 		self.pitch = pit;
-		Vector3 dir = (cos(pit) * cos(ang), cos(pit) * sin(ang), -sin(pit)); 									 // uuuuugh math :<
-		if (blood && !dent && (style == 1 || style == 2)) A_SprayDecal("bldstr1", 32.0, direction: dir);		 // 1.2a bloody hole
-		if (blood && !dent && (style == 3)) A_SprayDecal("bldstrhd", 32.0, direction: dir);						 // 1.2a bloody hole
+
+		Vector3 dir = (cos(pit) * cos(ang), cos(pit) * sin(ang), -sin(pit)); 													 // uuuuugh math :<
+		if (blood && bloodActor)
+		{
+			CopyBloodColor(bloodActor);
+			if (!dent && (style == 1 || style == 2)) A_SprayDecal("bldstr1", 32.0, useBloodColor: true, direction: dir);		 // 1.2a bloody hole
+			if (!dent && (style == 3)) A_SprayDecal("bldstrhd", 32.0, useBloodColor: true, direction: dir);					 // 1.2a bloody hole
+		}
 
 		switch (style)
 		{
@@ -155,9 +160,12 @@ class BulletPenetrationHandler : EventHandler
 			Array<double> exitX;
 			Array<double> exitY;
 			Array<double> exitZ;
-            Array<int>    entryBlood;	 // 1.2a bloody hole
-            Array<int>    exitBlood;	 // 1.2a bloody hole
-			int  blood_so_far = 0;		 // 1.2a bloody hole
+            Array<int>    entryBlood;		 // 1.2a bloody hole
+            Array<int>    exitBlood;		 // 1.2a bloody hole
+            Array<Actor>  entryBloodActor;	 // 1.2a bloody hole
+            Array<Actor>  exitBloodActor;	 // 1.2a bloody hole
+			int  blood_so_far = 0;			 // 1.2a bloody hole
+            Actor blood_actor_so_far = null; // 1.2a bloody hole
 
 			int  wallCount  = 0;
 			int  actorCount = 0;
@@ -206,8 +214,11 @@ class BulletPenetrationHandler : EventHandler
 					}
 
 					trc.MarkDamaged(victim);
-					if (!victim.bNoBlood || !bldhole) blood_so_far = 1; // 1.2a bloody hole
-
+					if (!victim.bNoBlood && bldhole)
+					{
+						blood_so_far = 1; // 1.2a bloody hole
+						blood_actor_so_far = victim;
+					}
 					cur_pos = hit_spot + t_dir * skip;
 					first_hit = false;
 					continue;
@@ -218,6 +229,7 @@ class BulletPenetrationHandler : EventHandler
 					Line entry_line = hit.HitLine;
 					PushVec(entryX, entryY, entryZ, hit_spot);
 					entryBlood.Push(blood_so_far);
+                    entryBloodActor.Push(blood_actor_so_far);
 
 					Vector3 exit_pos  = hit_spot;
 					bool   found_exit = false;
@@ -251,6 +263,7 @@ class BulletPenetrationHandler : EventHandler
 					double thickness = (exit_pos - hit_spot).Length();
 					PushVec(exitX, exitY, exitZ, exit_pos);
 					exitBlood.Push(blood_so_far);
+                    exitBloodActor.Push(blood_actor_so_far);
 					wallCount++;
 
 					if (debug)
@@ -271,10 +284,10 @@ class BulletPenetrationHandler : EventHandler
 
 				if (i == 0)
 				{
-					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true, blood);
+					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true, false, null);
 					continue;
 				}
-				trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, iCoutStyle, false, blood);
+				trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, iCoutStyle, false, (entryBlood[i] != 0), entryBloodActor[i]);
 			}
 
 			for (int i = 0; i < exitX.Size(); i++)
@@ -282,7 +295,7 @@ class BulletPenetrationHandler : EventHandler
 				Vector3 h = (exitX[i], exitY[i], exitZ[i]);
 				Vector3 sprayPos = h + t_dir * 4.0;
 				bool blood = (exitBlood[i] != 0);
-				trc.SprayDecalFromPos(sprayPos, final_angle + 180.0, -final_pitch, iCoutStyle, false, blood);
+				trc.SprayDecalFromPos(sprayPos, final_angle + 180.0, -final_pitch, iCoutStyle, false, (exitBlood[i] != 0), exitBloodActor[i]);
 			}
 			trc.Destroy();
 			if (debug) Console.printf("[TELLER] done: walls=%d actors=%d", wallCount, actorCount); // Penn and Teller. Get it? ha? well ok :<
