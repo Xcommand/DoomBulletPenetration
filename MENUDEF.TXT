@@ -6,14 +6,28 @@ OptionMenu "OptionsMenu"
 OptionMenu "BulletPenetrationMenu"
 {
     Title "$MOD_PEN_MENU_TITLE"
-    Slider "$MOD_PEN_MAX_COUNT", "mod_max_penetrations", 0, 128, 1
-    Slider "$MOD_PEN_WALL_THICK", "mod_max_wall_thickness", 2, 1024, 2
+	Option "Damage based penetrations", "DMG_based", "menu_DMG_based"
+    Slider "$MOD_PEN_MAX_COUNT", "mod_max_penetrations", 0, 128, 1, 1, "DMG_based", 1
+    Slider "$MOD_PEN_WALL_THICK", "mod_max_wall_thickness", 2, 1024, 2, 1, "DMG_based", 1
     Option "Accumulate soot", "decal_mode", "DecalStyleOptions"
     Option "Bullet exit hole style", "decal_modeHD", "DecalOutHD"
     Option "Bullet hole bleeds if monster has been hit", "blood_transfer", "blood_transfer"
+    Option "Penetration damage reduction", "DMG_reduction", "menu_DMG_reduction"
     StaticText "=== Debug and penetration test map ==="
     Option "Debug mode", "penetration_debug", "PEN_Debug"
 	Command "Penetration test map", "map PTEST", 1, 1
+}
+
+OptionValue "menu_DMG_based"
+{
+    0, "Off"
+    1, "On"
+}
+
+OptionValue "menu_DMG_reduction"
+{
+    0, "Off"
+    1, "On"
 }
 
 OptionValue "DecalStyleOptions"

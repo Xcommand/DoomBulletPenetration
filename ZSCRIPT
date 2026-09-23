@@ -16,7 +16,7 @@
 // ~Jump! (Pogo) Bounce! (Pogo) Up! (Pogo) Down! (Pogo)						//
 //																			//
 // Well you get the idea. X-command out ᕕ( ᐛ )ᕗ							//
-// Doom Penetration mod v1.2a												//
+// Doom Penetration mod v1.3!												//
 //////////////////////////////////////////////////////////////////////////////
 version "4.14"
 
@@ -42,20 +42,21 @@ class PenetrationTracer : Actor
 		return false;
 	}
 	void MarkDamaged(Actor a) { already_damaged.Push(a); }
-    void SprayDecalFromPos(Vector3 pos, double ang, double pit, int style, bool dent, bool blood, Actor bloodActor)
+	void SprayDecalFromPos(Vector3 pos, double ang, double pit, int style, bool dent, bool blood, Actor bloodActor, bool skiphole = false) // 1.2b bloody hole, skiphole = blood only, no hole from me
 	{
 		SetOrigin(pos, true);
 		self.angle = ang;
 		self.pitch = pit;
 
 		Vector3 dir = (cos(pit) * cos(ang), cos(pit) * sin(ang), -sin(pit)); 													 // uuuuugh math :<
-		if (blood && bloodActor)
+		if (blood && bloodActor && !dent)
 		{
 			CopyBloodColor(bloodActor);
-			if (!dent && (style == 1 || style == 2)) A_SprayDecal("bldstr1", 32.0, useBloodColor: true, direction: dir);		 // 1.2a bloody hole
-			if (!dent && (style == 3)) A_SprayDecal("bldstrhd", 32.0, useBloodColor: true, direction: dir);					 // 1.2a bloody hole
+			if (style == 1 || style == 2) A_SprayDecal("bldstr1", 32.0, useBloodColor: true, direction: dir);		 // 1.2a bloody hole
+			if (style == 3) A_SprayDecal("bldstrhd", 32.0, useBloodColor: true, direction: dir);					 // 1.2a bloody hole
 		}
 
+		if (skiphole) return;
 		switch (style)
 		{
 			case 0: break;
@@ -74,11 +75,24 @@ class BulletPenetrationHandler : EventHandler
 	private Array<double> shot_pitches;
 	private Array<int>	shot_damages;
 	private Array<Actor>  vanilla_hit;
+	private Array<double>  shot_impX; // 1.2b bloody hole, game's own puff spot
+	private Array<double>  shot_impY;
+	private Array<double>  shot_impZ;
+	private Array<bool>    shot_hasimpact;
 	private bool we_damaging;
 
 	private void PushVec(Array<double> xs, Array<double> ys, Array<double> zs, Vector3 v)
 	{
 		xs.Push(v.X); ys.Push(v.Y); zs.Push(v.Z);
+	}
+
+	// 1.3 dmg based: how hard a bullet punches per point of damage. tiers keep weak guns from boring thru fortresses
+	private int BulletPotential(int dmg)
+	{
+		if (dmg < 10) return 3;
+		if (dmg < 20) return 4;
+		if (dmg < 40) return 6;
+		return 7;
 	}
 
 	override bool WorldHitscanPreFired(WorldEvent e)
@@ -90,7 +104,11 @@ class BulletPenetrationHandler : EventHandler
 		if (e.AttackLineFlags & (1 | 2 | 8)) return false;
 		Weapon rw = plr.ReadyWeapon;
 		if (!rw || rw.bMeleeWeapon) return false;
-		if (CVar.GetCVar("mod_max_penetrations", plr).GetInt() <= 0) return false;
+		if (CVar.GetCVar("DMG_based", plr).GetBool()) // 1.3 dmg based, sliders are decoration now
+		{
+			if (e.Damage <= 0) return false;
+		}
+		else if (CVar.GetCVar("mod_max_penetrations", plr).GetInt() <= 0) return false;
 
 		shot_shooters.Push(shooter);
 		shot_angles.Push(e.AttackAngle);
@@ -98,7 +116,26 @@ class BulletPenetrationHandler : EventHandler
 		int dmg = e.Damage;
 		if (dmg <= 0) dmg = 0;
 		shot_damages.Push(dmg);
+		shot_impX.Push(0); shot_impY.Push(0); shot_impZ.Push(0); shot_hasimpact.Push(false); // 1.2b bloody hole, WorldHitscanFired fills it in
 		return false;
+	}
+
+	// 1.2b bloody hole: uzdoom has no PostFired, its "Fired" event hands me the exact spot where the game's puff landed. so the blood can sit ON her hole instead of near it
+	override void WorldHitscanFired(WorldEvent e)
+	{
+		Actor shooter = e.Thing;
+		if (!shooter) return;
+		for (int i = shot_shooters.Size() - 1; i >= 0; i--) // fired follows pre per pellet, so imma grabbin the first record without a spot
+		{
+			if (shot_shooters[i] == shooter && !shot_hasimpact[i])
+			{
+				shot_impX[i] = e.DamagePosition.X;
+				shot_impY[i] = e.DamagePosition.Y;
+				shot_impZ[i] = e.DamagePosition.Z;
+				shot_hasimpact[i] = true;
+				return;
+			}
+		}
 	}
 
 	override void WorldThingDamaged(WorldEvent e)
@@ -125,9 +162,21 @@ class BulletPenetrationHandler : EventHandler
 			PlayerInfo plr = shooter.player;
 			if (!plr || plr.health <= 0) continue;
 
-			int max_p = CVar.GetCVar("mod_max_penetrations", plr).GetInt();
+			int max_p;
+			int max_thickness;
+			bool dmgmode = CVar.GetCVar("DMG_based", plr).GetBool(); // 1.3 dmg based
+			if (dmgmode)
+			{
+				int pot = BulletPotential(shot_damages[s]); // per pellet budget, shotgun pellets each get their own run
+				max_p = (shot_damages[s] + pot - 1) / pot;	 // 1.3 ceil(dmg/pot), even 1.01 rounds up
+				max_thickness = int(3.5 * shot_damages[s] + 0.5); // 1.3 3.5 units of wall per point of damage
+			}
+			else
+			{
+				max_p = CVar.GetCVar("mod_max_penetrations", plr).GetInt();
+				max_thickness = CVar.GetCVar("mod_max_wall_thickness", plr).GetInt();
+			}
 			if (max_p <= 0) continue;
-			int max_thickness = CVar.GetCVar("mod_max_wall_thickness", plr).GetInt();
 			if (max_thickness < 1) max_thickness = 1;
 
 			CVar dbgCv = CVar.GetCVar("penetration_debug", plr);
@@ -135,6 +184,9 @@ class BulletPenetrationHandler : EventHandler
 
 			CVar bldCv = CVar.GetCVar("blood_transfer", plr); // 1.2a bloody hole
 			bool bldhole = (bldCv);		 // 1.2a bloody hole
+
+			CVar redCv = CVar.GetCVar("DMG_reduction", plr); // 1.3 dmg reduction
+			bool dmgred = (redCv && redCv.GetInt() != 0); // 1.3 dmg reduction, works with either mode
 
 			double final_angle = shot_angles[s];
 			double final_pitch = shot_pitches[s];
@@ -160,25 +212,30 @@ class BulletPenetrationHandler : EventHandler
 			Array<double> exitX;
 			Array<double> exitY;
 			Array<double> exitZ;
-            Array<int>    entryBlood;		 // 1.2a bloody hole
-            Array<int>    exitBlood;		 // 1.2a bloody hole
-            Array<Actor>  entryBloodActor;	 // 1.2a bloody hole
-            Array<Actor>  exitBloodActor;	 // 1.2a bloody hole
+			Array<int>    entryBlood;		 // 1.2a bloody hole
+			Array<int>    exitBlood;		 // 1.2a bloody hole
+			Array<Actor>  entryBloodActor;	 // 1.2a bloody hole
+			Array<Actor>  exitBloodActor;	 // 1.2a bloody hole
 			int  blood_so_far = 0;			 // 1.2a bloody hole
-            Actor blood_actor_so_far = null; // 1.2a bloody hole
+			Actor blood_actor_so_far = null; // 1.2a bloody hole
 
 			int  wallCount  = 0;
 			int  actorCount = 0;
+			int  pen_count  = 0; // 1.3 shared budget, walls and bodies drain it together
 			int  c_dmg = shot_damage;
+			int  pot_red = BulletPotential(shot_damage); // 1.3 dmg reduction, the tier is baked into the gun not into what's left of the shot
 			bool first_hit = true;
 			Vector3 cur_pos = eye_pos;
 			int guard = 0;
+			int     last_wall = -1;	 		 // 1.2b bloody hole, wall i crawled out of last
+			Vector3 last_exit = (0, 0, 0);	 // 1.2b and where its exit was
+			bool    pass_actors = false;	 // 1.2b a wall sits in front of me, trace thru actors so i don't jump it away
 
-			while (wallCount < max_p && guard++ < 128) // lets add mod_max_penetrations max value just in case ¯\_(ツ)_/¯
+			while ((dmgmode || wallCount < max_p) && guard++ < 128) // 1.3 dmg mode drains the budget inside the loop so the last hit still resolves. ~Soon I'll come around.
 			{
 				trc.SetOrigin(cur_pos, true);
 				FLineTraceData hit;
-				trc.LineTrace(trc.angle, 16384, trc.pitch, TRF_ALLACTORS, 0, data: hit);
+				trc.LineTrace(trc.angle, 16384, trc.pitch, pass_actors ? TRF_THRUACTORS : TRF_ALLACTORS, 0, data: hit); // 1.2b wall-aware hop lets me see thru a mob hugging a wall
 
 				if (hit.HitType == TRACE_HitNone ||	hit.HitType == TRACE_HitFloor || hit.HitType == TRACE_HitCeiling) break;
 				Vector3 hit_spot = cur_pos + t_dir * hit.Distance;
@@ -194,32 +251,62 @@ class BulletPenetrationHandler : EventHandler
 
 					if (victim == shooter) // ah hell naw i'm not the one who bleeds here
 					{
-						cur_pos = hit_spot + t_dir * skip;
+						FLineTraceData wall_ahead;
+						trc.LineTrace(trc.angle, skip, trc.pitch, TRF_THRUACTORS, 0, data: wall_ahead); // 1.2b fat mobs hide walls from a blind hop
+						if (wall_ahead.HitType == TRACE_HitWall && wall_ahead.HitLine != null) cur_pos = hit_spot + t_dir * (wall_ahead.Distance * 0.5);
+						else cur_pos = hit_spot + t_dir * skip;
+						pass_actors = (wall_ahead.HitType == TRACE_HitWall && wall_ahead.HitLine != null);
 						first_hit = false;
 						continue;
 					}
 
 					bool already = false;
 
+					bool last_stand = (dmgmode && pen_count >= max_p); // 1.3 nothing left to spend, whatever i hit here is the bullets grave
+
 					for (int k = 0; k < vanilla_hit.Size(); k++)
 						if (vanilla_hit[k] == victim) { already = true; break; }
 
-					if (!first_hit && victim != shooter && !trc.HasDamagedActor(victim) && !already)
+					if (!first_hit && victim != shooter && victim.bShootable && !trc.HasDamagedActor(victim) && !already) // 1.2b bloody hole, bShootable
 					{
 						we_damaging = true;
 						victim.DamageMobj(shooter, shooter, c_dmg, 'Bullet');
 						we_damaging = false;
+						vanilla_hit.Push(victim); // 1.2b bloody hole
 						actorCount++;
-						if (debug) Console.printf("[PEN] dmg %s", victim.GetClassName());
+						if (dmgmode) pen_count++; // 1.3 a body ate one penetration, hungry hungry wall
+						if (dmgred && c_dmg > 0) c_dmg -= c_dmg / pot_red; // 1.3 dmg reduction, a body eats a share of the shot
+						if (debug) Console.printf("[PEN] dmg %s for %d", victim.GetClassName(), c_dmg); // 1.3 dmg reduction, show what actually landed
 					}
 
 					trc.MarkDamaged(victim);
-					if (!victim.bNoBlood && bldhole)
+					bool fresh = false;
+					for (int k = 0; k < vanilla_hit.Size(); k++)
+						if (vanilla_hit[k] == victim) { fresh = true; break; }
+
+					if (fresh && !victim.bNoBlood && bldhole)
 					{
 						blood_so_far = 1; // 1.2a bloody hole
 						blood_actor_so_far = victim;
+
+						if (last_wall >= 0 && (hit_spot - last_exit).Length() <= 24.0) // 1.2b bloody hole: victim hugs the wall we just left, backdate the blood onto its holes
+						{
+							entryBlood[last_wall] = 1;
+							entryBloodActor[last_wall] = victim;
+							exitBlood[last_wall] = 1;
+							exitBloodActor[last_wall] = victim;
+						}
 					}
-					cur_pos = hit_spot + t_dir * skip;
+					if (last_stand) break; // 1.3 did the damage, drew nothing yet, keep on keeping on.
+					// 1.2b same trick here: stop in front of a wall the mob was hiding, next trace goes thru actors and finds it
+					FLineTraceData wall_ahead;
+					trc.LineTrace(trc.angle, skip, trc.pitch, TRF_THRUACTORS, 0, data: wall_ahead);
+					if (wall_ahead.HitType == TRACE_HitWall && wall_ahead.HitLine != null)
+					{
+						cur_pos = hit_spot + t_dir * (wall_ahead.Distance * 0.5);
+						pass_actors = true;
+					}
+					else cur_pos = hit_spot + t_dir * skip;
 					first_hit = false;
 					continue;
 				}
@@ -229,7 +316,9 @@ class BulletPenetrationHandler : EventHandler
 					Line entry_line = hit.HitLine;
 					PushVec(entryX, entryY, entryZ, hit_spot);
 					entryBlood.Push(blood_so_far);
-                    entryBloodActor.Push(blood_actor_so_far);
+					entryBloodActor.Push(blood_actor_so_far);
+
+					if (dmgmode && pen_count >= max_p) break; // 1.3 out of budget, entry hole only, the wall keeps the bullet
 
 					Vector3 exit_pos  = hit_spot;
 					bool   found_exit = false;
@@ -255,7 +344,7 @@ class BulletPenetrationHandler : EventHandler
 						probe_dist *= 2.0;
 					}
 
-					if (!found_exit)
+					if (!found_exit) // ~1.3 Lost and never found
 					{
 						if (debug) Console.printf("[OHNO] #%d: no exit", wallCount + 1); // LET ME IIIINNNN https://www.youtube.com/watch?v=ow-WdjzfmaI
 						break;
@@ -263,14 +352,19 @@ class BulletPenetrationHandler : EventHandler
 					double thickness = (exit_pos - hit_spot).Length();
 					PushVec(exitX, exitY, exitZ, exit_pos);
 					exitBlood.Push(blood_so_far);
-                    exitBloodActor.Push(blood_actor_so_far);
-					wallCount++;
+					exitBloodActor.Push(blood_actor_so_far);
+					wallCount++; 
+					pen_count++; // 1.3 walls hit the same meter ~Waiting for my words
+					if (dmgred && c_dmg > 0) c_dmg -= c_dmg / pot_red; // 1.3 dmg reduction, walls chew on the bullet too
+					pass_actors = false; // 1.2b wall is on record now, back to normal seeing
+					last_wall = exitX.Size() - 1;	 // 1.2b bloody hole
+					last_exit = exit_pos;	 // 1.2b bloody hole
 
 					if (debug)
 						Console.printf("[PEN] wall #%d: thickness=%.2f blood=%d", wallCount, thickness, blood_so_far);
 
 					cur_pos   = exit_pos + t_dir * 0.5;
-					first_hit = false;
+					first_hit = false; // ~Seen but never heard, ~buried underground
 					continue;
 				}
 				break;
@@ -284,6 +378,17 @@ class BulletPenetrationHandler : EventHandler
 
 				if (i == 0)
 				{
+					if (blood) // 1.2b bloody hole, safe now: entryBlood only ever holds blood from victims this shot actually bit
+					{
+						Vector3 bpos = sprayPos;
+						if (shot_hasimpact[s])
+						{
+							Vector3 gspot = (shot_impX[s], shot_impY[s], shot_impZ[s]);
+							if ((gspot - h).Length() <= 32.0) bpos = gspot; // her spot already sits ~4 off the wall, no extra offset needed
+						}
+						trc.SprayDecalFromPos(bpos, final_angle, final_pitch, iCoutStyle, false, true, entryBloodActor[0], true);
+						trc.SprayDecalFromPos(bpos, final_angle, final_pitch, 1, false, false, null); // 1.2b bloody hole, re-dig BulletChip over the blood
+					}
 					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true, false, null);
 					continue;
 				}
@@ -304,6 +409,10 @@ class BulletPenetrationHandler : EventHandler
 		shot_angles.Clear();
 		shot_pitches.Clear();
 		shot_damages.Clear();
-		vanilla_hit.Clear();
+		shot_impX.Clear();
+		shot_impY.Clear();
+		shot_impZ.Clear();
+		shot_hasimpact.Clear();
+		vanilla_hit.Clear(); // holy-moly it's like a total CLEANING in here, But I'll keep coming ;)
 	}
 }
