@@ -23,5 +23,12 @@ v1.2a
 - Bloody holes can be toggled in options menu.
 - Blood decal quality also uses "Bullet exit hole style" where 0 - no decal, 1 and 2 - lowres sprite and 3 - HD version.
 
-TODO:
-- Damage reduction with each penetration option: Reduction per penetration? Reduction based on penetrated material? Or both? hmmm
+v1.2b
+- If enemy hugs the other side of a penetrated wall and takes damage, the entry bullet hole will bleed too.
+
+v1.3
+- Two new core features added. Damage based penetration and damage reduction!
+- Damage based penetration: calculates how many walls\actors player can penetrate.
+- Also it calculates maximum thickness of the wall it can penetrate.
+- Damage reduction setting: decreases dealt damage based on how many things you penetrated.
+- Damage reduction can be used with damage based penetration and without it!
