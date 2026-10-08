@@ -32,3 +32,9 @@ v1.3
 - Also it calculates maximum thickness of the wall it can penetrate.
 - Damage reduction setting: decreases dealt damage based on how many things you penetrated.
 - Damage reduction can be used with damage based penetration and without it!
+
+v1.3a
+- First bullet hole now sprays blood the same way a body does, not only the slow trickle.
+- The spray flies backwards, into the room you are standing in, so the wall you shoot at is no longer painted red. We already draw the bleeding hole there, that is enough for it.
+- Blood type and color are taken from the enemy behind the wall, so every species bleeds like itself, modded gore included.
+- Fixed "Bullet hole bleeds if monster has been hit". Off means off now: no spray, no trickle, while bullet holes and dents stay as usual.
