@@ -183,7 +183,7 @@ class BulletPenetrationHandler : EventHandler
 			bool debug = (dbgCv && dbgCv.GetInt() != 0);
 
 			CVar bldCv = CVar.GetCVar("blood_transfer", plr); // 1.2a bloody hole
-			bool bldhole = (bldCv);		 // 1.2a bloody hole
+			bool bldhole = (bldCv && bldCv.GetInt() != 0); // 1.3a now the switch actually does something, before it only checked that the cvar exists
 
 			CVar redCv = CVar.GetCVar("DMG_reduction", plr); // 1.3 dmg reduction
 			bool dmgred = (redCv && redCv.GetInt() != 0); // 1.3 dmg reduction, works with either mode
@@ -388,6 +388,7 @@ class BulletPenetrationHandler : EventHandler
 						}
 						trc.SprayDecalFromPos(bpos, final_angle, final_pitch, iCoutStyle, false, true, entryBloodActor[0], true);
 						trc.SprayDecalFromPos(bpos, final_angle, final_pitch, 1, false, false, null); // 1.2b bloody hole, re-dig BulletChip over the blood
+						if (entryBloodActor[0]) entryBloodActor[0].SpawnBlood(bpos, final_angle + 180.0, shot_damage); // 1.3a splash out of her hole as well, but backwards: forward would paint the wall we are aiming at
 					}
 					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true, false, null);
 					continue;
