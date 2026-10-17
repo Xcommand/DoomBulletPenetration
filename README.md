@@ -38,3 +38,8 @@ v1.3a
 - The spray flies backwards, into the room you are standing in, so the wall you shoot at is no longer painted red. We already draw the bleeding hole there, that is enough for it.
 - Blood type and color are taken from the enemy behind the wall, so every species bleeds like itself, modded gore included.
 - Fixed "Bullet hole bleeds if monster has been hit". Off means off now: no spray, no trickle, while bullet holes and dents stay as usual.
+
+v1.3b
+- Fixed short range weapons penetrating thru the entire map. Penetration now stops where the shot's own range stops.
+- Found this on the Doom Deluxe nailgun: holding alt fire, its saw was cutting actors in the other end of the map. Now it bites only within its own melee distance, like without the mod.
+- Every gun follows the same rule now. If its hitscan reaches 2048, walls behind 2048 are not opened anymore.
