@@ -16,7 +16,7 @@
 // ~Jump! (Pogo) Bounce! (Pogo) Up! (Pogo) Down! (Pogo)						//
 //																			//
 // Well you get the idea. X-command out ᕕ( ᐛ )ᕗ							//
-// Doom Penetration mod v1.3!												//
+// Doom Penetration mod v1.3b												//
 //////////////////////////////////////////////////////////////////////////////
 version "4.14"
 
@@ -74,6 +74,7 @@ class BulletPenetrationHandler : EventHandler
 	private Array<double> shot_angles;
 	private Array<double> shot_pitches;
 	private Array<int>	shot_damages;
+	private Array<double> shot_ranges; // 1.3b how far this very shot reaches, the gun decides not me
 	private Array<Actor>  vanilla_hit;
 	private Array<double>  shot_impX; // 1.2b bloody hole, game's own puff spot
 	private Array<double>  shot_impY;
@@ -116,6 +117,7 @@ class BulletPenetrationHandler : EventHandler
 		int dmg = e.Damage;
 		if (dmg <= 0) dmg = 0;
 		shot_damages.Push(dmg);
+		shot_ranges.Push(e.AttackDistance); // 1.3b the engine hands me the range this shot actually uses
 		shot_impX.Push(0); shot_impY.Push(0); shot_impZ.Push(0); shot_hasimpact.Push(false); // 1.2b bloody hole, WorldHitscanFired fills it in
 		return false;
 	}
@@ -183,7 +185,7 @@ class BulletPenetrationHandler : EventHandler
 			bool debug = (dbgCv && dbgCv.GetInt() != 0);
 
 			CVar bldCv = CVar.GetCVar("blood_transfer", plr); // 1.2a bloody hole
-			bool bldhole = (bldCv && bldCv.GetInt() != 0); // 1.3a now the switch actually does something, before it only checked that the cvar exists
+			bool bldhole = (bldCv && bldCv.GetInt() != 0); // 1.3b now the switch actually does something, before it only checked that the cvar exists
 
 			CVar redCv = CVar.GetCVar("DMG_reduction", plr); // 1.3 dmg reduction
 			bool dmgred = (redCv && redCv.GetInt() != 0); // 1.3 dmg reduction, works with either mode
@@ -191,6 +193,7 @@ class BulletPenetrationHandler : EventHandler
 			double final_angle = shot_angles[s];
 			double final_pitch = shot_pitches[s];
 			int	shot_damage = shot_damages[s];
+			double reach = shot_ranges[s]; // 1.3b a saw that cuts 64 units must not punch across the whole map
 
 			Vector3 t_dir = (cos(final_pitch) * cos(final_angle), cos(final_pitch) * sin(final_angle), -sin(final_pitch));
 			Vector3 eye_pos = shooter.Pos + (0, 0, plr.viewheight);
@@ -234,8 +237,10 @@ class BulletPenetrationHandler : EventHandler
 			while ((dmgmode || wallCount < max_p) && guard++ < 128) // 1.3 dmg mode drains the budget inside the loop so the last hit still resolves. ~Soon I'll come around.
 			{
 				trc.SetOrigin(cur_pos, true);
+				double remaining = reach - (cur_pos - eye_pos).Length(); // 1.3b how much of this shot's own range is left
+				if (remaining <= 0) break;
 				FLineTraceData hit;
-				trc.LineTrace(trc.angle, 16384, trc.pitch, pass_actors ? TRF_THRUACTORS : TRF_ALLACTORS, 0, data: hit); // 1.2b wall-aware hop lets me see thru a mob hugging a wall
+				trc.LineTrace(trc.angle, remaining, trc.pitch, pass_actors ? TRF_THRUACTORS : TRF_ALLACTORS, 0, data: hit); // 1.2b wall-aware hop lets me see thru a mob hugging a wall
 
 				if (hit.HitType == TRACE_HitNone ||	hit.HitType == TRACE_HitFloor || hit.HitType == TRACE_HitCeiling) break;
 				Vector3 hit_spot = cur_pos + t_dir * hit.Distance;
@@ -388,7 +393,7 @@ class BulletPenetrationHandler : EventHandler
 						}
 						trc.SprayDecalFromPos(bpos, final_angle, final_pitch, iCoutStyle, false, true, entryBloodActor[0], true);
 						trc.SprayDecalFromPos(bpos, final_angle, final_pitch, 1, false, false, null); // 1.2b bloody hole, re-dig BulletChip over the blood
-						if (entryBloodActor[0]) entryBloodActor[0].SpawnBlood(bpos, final_angle + 180.0, shot_damage); // 1.3a splash out of her hole as well, but backwards: forward would paint the wall we are aiming at
+						if (entryBloodActor[0]) entryBloodActor[0].SpawnBlood(bpos, final_angle + 180.0, shot_damage); // 1.3b splash out of her hole as well, but backwards: forward would paint the wall we are aiming at
 					}
 					if (bDentMode) trc.SprayDecalFromPos(sprayPos, final_angle, final_pitch, 0, true, false, null);
 					continue;
@@ -410,6 +415,7 @@ class BulletPenetrationHandler : EventHandler
 		shot_angles.Clear();
 		shot_pitches.Clear();
 		shot_damages.Clear();
+		shot_ranges.Clear(); // 1.3b ranges leave with the shot they belong to
 		shot_impX.Clear();
 		shot_impY.Clear();
 		shot_impZ.Clear();
