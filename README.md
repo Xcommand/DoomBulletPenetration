@@ -43,3 +43,8 @@ v1.3b
 - Fixed short range weapons penetrating thru the entire map. Penetration now stops where the shot's own range stops.
 - Found this on the Doom Deluxe nailgun: holding alt fire, its saw was cutting actors in the other end of the map. Now it bites only within its own melee distance, like without the mod.
 - Every gun follows the same rule now. If its hitscan reaches 2048, walls behind 2048 are not opened anymore.
+
+v1.3c
+- Shotgun pellets now penetrate one by one. Before, only the first pellet of a volley dealt damage thru a wall, the rest were silenced by the anti double-damage check.
+- Visible enemies are unchanged. The game still handles them itself and nothing is added on top.
+- Balance note: a volley thru a thin wall now hits as many times as there are pellets in it.
