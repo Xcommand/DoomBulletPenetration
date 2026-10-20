@@ -16,7 +16,7 @@
 // ~Jump! (Pogo) Bounce! (Pogo) Up! (Pogo) Down! (Pogo)						//
 //																			//
 // Well you get the idea. X-command out ᕕ( ᐛ )ᕗ							//
-// Doom Penetration mod v1.3b												//
+// Doom Penetration mod v1.3c												//
 //////////////////////////////////////////////////////////////////////////////
 version "4.14"
 
@@ -266,6 +266,7 @@ class BulletPenetrationHandler : EventHandler
 					}
 
 					bool already = false;
+					bool we_hit_it = false; // 1.3c did this pellet bite this body
 
 					bool last_stand = (dmgmode && pen_count >= max_p); // 1.3 nothing left to spend, whatever i hit here is the bullets grave
 
@@ -277,7 +278,7 @@ class BulletPenetrationHandler : EventHandler
 						we_damaging = true;
 						victim.DamageMobj(shooter, shooter, c_dmg, 'Bullet');
 						we_damaging = false;
-						vanilla_hit.Push(victim); // 1.2b bloody hole
+						we_hit_it = true; // 1.3c i bit her myself, that is not the game's list to hold
 						actorCount++;
 						if (dmgmode) pen_count++; // 1.3 a body ate one penetration, hungry hungry wall
 						if (dmgred && c_dmg > 0) c_dmg -= c_dmg / pot_red; // 1.3 dmg reduction, a body eats a share of the shot
@@ -285,7 +286,7 @@ class BulletPenetrationHandler : EventHandler
 					}
 
 					trc.MarkDamaged(victim);
-					bool fresh = false;
+					bool fresh = we_hit_it; // 1.3c my own hit makes her a donor too
 					for (int k = 0; k < vanilla_hit.Size(); k++)
 						if (vanilla_hit[k] == victim) { fresh = true; break; }
 
