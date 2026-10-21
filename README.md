@@ -46,5 +46,6 @@ v1.3b
 
 v1.3c
 - Shotgun pellets now penetrate one by one. Before, only the first pellet of a volley dealt damage thru a wall, the rest were silenced by the anti double-damage check.
-- Visible enemies are unchanged. The game still handles them itself and nothing is added on top.
-- Balance note: a volley thru a thin wall now hits as many times as there are pellets in it.
+- New option "Damage decays with wall and body thickness", off by default. On, the shot carries a reserve of penetration measured in map units instead of a yes or no answer per wall. Every wall eats its real thickness from that reserve, every body eats how deep it is, and the damage that comes out is the share of the reserve still alive. Out of reserve means the shot stops there for good.
+- Bodies are counted as the thick objects they are now. A baron standing right behind a thin wall stops a pistol, a zombie does not stop a rifle.
+- While the decay option is on it decides the damage itself, so "Penetration damage reduction" steps aside. Two knobs on one number was asking for confusion.
