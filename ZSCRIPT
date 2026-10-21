@@ -88,6 +88,23 @@ class BulletPenetrationHandler : EventHandler
 	}
 
 	// 1.3 dmg based: how hard a bullet punches per point of damage. tiers keep weak guns from boring thru fortresses
+	// 1.3c how deep a body is along the ray. a sprite is a billboard, not a cylinder, so this
+	// is the widest honest guess: the chord of its radius at the height the bullet came in.
+	private double ActorBulk(Actor v, Vector3 at, Vector3 dir)
+	{
+		Vector3 mid = v.Pos + (0, 0, v.Height * 0.5);
+		Vector3 off = at - mid;
+		double along = off.X * dir.X + off.Y * dir.Y + off.Z * dir.Z;
+		off = off - dir * along;
+		Vector3 flat = (off.X, off.Y, 0);
+		double d = flat.Length();
+		double rad = v.Radius;
+		if (d >= rad) return 4.0; // grazed an edge, almost nothing to swim thru
+		double chord = 2.0 * sqrt(rad * rad - d * d);
+		if (chord > v.Height) chord = v.Height; // a steep shot leaves a body thru its top, not its far side
+		return chord < 4.0 ? 4.0 : chord;
+	}
+
 	private int BulletPotential(int dmg)
 	{
 		if (dmg < 10) return 3;
@@ -189,6 +206,9 @@ class BulletPenetrationHandler : EventHandler
 
 			CVar redCv = CVar.GetCVar("DMG_reduction", plr); // 1.3 dmg reduction
 			bool dmgred = (redCv && redCv.GetInt() != 0); // 1.3 dmg reduction, works with either mode
+			CVar decCv = CVar.GetCVar("THICK_decay", plr); // 1.3c thickness becomes the currency
+			bool decay = (decCv && decCv.GetInt() != 0);
+			if (decay) dmgred = false; // 1.3c one knob per meaning: decay decides the damage itself
 
 			double final_angle = shot_angles[s];
 			double final_pitch = shot_pitches[s];
@@ -226,6 +246,8 @@ class BulletPenetrationHandler : EventHandler
 			int  actorCount = 0;
 			int  pen_count  = 0; // 1.3 shared budget, walls and bodies drain it together
 			int  c_dmg = shot_damage;
+			double power0 = double(max_thickness); // 1.3c the reserve this shot starts with
+			double power  = power0;
 			int  pot_red = BulletPotential(shot_damage); // 1.3 dmg reduction, the tier is baked into the gun not into what's left of the shot
 			bool first_hit = true;
 			Vector3 cur_pos = eye_pos;
@@ -234,7 +256,7 @@ class BulletPenetrationHandler : EventHandler
 			Vector3 last_exit = (0, 0, 0);	 // 1.2b and where its exit was
 			bool    pass_actors = false;	 // 1.2b a wall sits in front of me, trace thru actors so i don't jump it away
 
-			while ((dmgmode || wallCount < max_p) && guard++ < 128) // 1.3 dmg mode drains the budget inside the loop so the last hit still resolves. ~Soon I'll come around.
+			while ((dmgmode || wallCount < max_p) && (!decay || power > 0) && guard++ < 128) // 1.3 dmg mode drains the budget inside the loop so the last hit still resolves. ~Soon I'll come around.
 			{
 				trc.SetOrigin(cur_pos, true);
 				double remaining = reach - (cur_pos - eye_pos).Length(); // 1.3b how much of this shot's own range is left
@@ -286,6 +308,14 @@ class BulletPenetrationHandler : EventHandler
 					}
 
 					trc.MarkDamaged(victim);
+					if (decay && victim.bShootable) // 1.3c a body is not free, it costs as deep as it is
+					{
+						double bulk = ActorBulk(victim, hit_spot, t_dir);
+						power -= bulk;
+						if (power < 0) power = 0;
+						c_dmg = int(shot_damage * power / power0 + 0.5);
+						if (debug) Console.printf("[PEN] body %s bulk=%.1f left=%.1f", victim.GetClassName(), bulk, power);
+					}
 					bool fresh = we_hit_it; // 1.3c my own hit makes her a donor too
 					for (int k = 0; k < vanilla_hit.Size(); k++)
 						if (vanilla_hit[k] == victim) { fresh = true; break; }
@@ -332,7 +362,7 @@ class BulletPenetrationHandler : EventHandler
 
 					for (int attempt = 0; attempt < 12; attempt++)
 					{
-						if (probe_dist > double(max_thickness) + 4.0) break;
+						if (probe_dist > (decay ? power : double(max_thickness)) + 4.0) break; // 1.3c the wall must fit in what is left, not in the original cap
 
 						Vector3 probe = hit_spot + t_dir * probe_dist;
 						trc.SetOrigin(probe, true);
@@ -361,6 +391,12 @@ class BulletPenetrationHandler : EventHandler
 					exitBloodActor.Push(blood_actor_so_far);
 					wallCount++; 
 					pen_count++; // 1.3 walls hit the same meter ~Waiting for my words
+					if (decay) // 1.3c the wall ate its own thickness out of the reserve
+					{
+						power -= thickness;
+						if (power < 0) power = 0;
+						c_dmg = int(shot_damage * power / power0 + 0.5);
+					}
 					if (dmgred && c_dmg > 0) c_dmg -= c_dmg / pot_red; // 1.3 dmg reduction, walls chew on the bullet too
 					pass_actors = false; // 1.2b wall is on record now, back to normal seeing
 					last_wall = exitX.Size() - 1;	 // 1.2b bloody hole

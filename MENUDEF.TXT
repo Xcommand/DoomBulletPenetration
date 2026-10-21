@@ -13,6 +13,8 @@ OptionMenu "BulletPenetrationMenu"
     Option "Bullet exit hole style", "decal_modeHD", "DecalOutHD"
     Option "Bullet hole bleeds if monster has been hit", "blood_transfer", "blood_transfer"
     Option "Penetration damage reduction", "DMG_reduction", "menu_DMG_reduction"
+    Option "Damage decays with wall and body thickness", "THICK_decay", "menu_THICK_decay"
+    Tooltip "On: the shot carries a reserve of penetration in map units instead of a yes or no per wall. Every wall and every body eats its real thickness from it, and the damage that comes out is the share of the reserve still alive. Replaces the damage reduction switch while on. Default: 0 (Off)"
     StaticText "=== Debug and penetration test map ==="
     Option "Debug mode", "penetration_debug", "PEN_Debug"
 	Command "Penetration test map", "map PTEST", 1, 1
@@ -51,6 +53,12 @@ OptionValue "DecalOutHD"
 }
 
 OptionValue "PEN_Debug"
+{
+    0, "Off"
+    1, "On"
+}
+
+OptionValue "menu_THICK_decay"
 {
     0, "Off"
     1, "On"

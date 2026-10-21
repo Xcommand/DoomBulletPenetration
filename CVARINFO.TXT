@@ -6,3 +6,4 @@ server int decal_modeHD = 1;
 server int blood_transfer = 1;
 server int DMG_based = 1;
 server int DMG_reduction = 1;
+server int THICK_decay = 0;
